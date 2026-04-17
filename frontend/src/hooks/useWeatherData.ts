@@ -1,14 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { CityConfig, CityWeather, WeatherState } from '../types';
+import { DEFAULT_CITIES } from './useCities';
 
-export const CITIES: CityConfig[] = [
-  { id: 'corpus',      name: 'Corpus Christi', lat: 27.8006, lon: -97.3964, mapX: '42%', mapY: '38%' },
-  { id: 'brownsville', name: 'Brownsville',    lat: 25.9017, lon: -97.4975, mapX: '55%', mapY: '72%' },
-  { id: 'mcallen',     name: 'McAllen',        lat: 26.2034, lon: -98.2300, mapX: '43%', mapY: '65%' },
-];
+export { DEFAULT_CITIES as CITIES };
 
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
+const AIR_QUALITY_API = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 
 function weatherCodeToDesc(code: number): string {
   if (code === 0) return 'Clear Sky';
@@ -50,8 +48,21 @@ async function fetchCityWeather(city: CityConfig): Promise<CityWeather> {
     windspeed_unit: 'mph',
     precipitation_unit: 'inch',
   };
-  const res = await axios.get(OPEN_METEO, { params });
-  const c = res.data.current;
+
+  const [weatherRes, aqiRes] = await Promise.allSettled([
+    axios.get(OPEN_METEO, { params }),
+    axios.get(AIR_QUALITY_API, {
+      params: { latitude: city.lat, longitude: city.lon, current: 'us_aqi' },
+    }),
+  ]);
+
+  if (weatherRes.status === 'rejected') throw (weatherRes as PromiseRejectedResult).reason;
+
+  const c = (weatherRes as PromiseFulfilledResult<{ data: { current: Record<string, number> } }>).value.data.current;
+  const aqiData = aqiRes.status === 'fulfilled'
+    ? (aqiRes as PromiseFulfilledResult<{ data: { current: { us_aqi?: number } } }>).value.data.current
+    : null;
+
   return {
     cityId:        city.id,
     tempF:         Math.round(c.temperature_2m),
@@ -61,6 +72,7 @@ async function fetchCityWeather(city: CityConfig): Promise<CityWeather> {
     precipitation: c.precipitation,
     cloudCover:    Math.round(c.cloudcover),
     weatherCode:   c.weathercode,
+    aqi:           aqiData?.us_aqi ?? undefined,
     loading:       false,
     error:         false,
   };
@@ -71,19 +83,11 @@ function windDirToCardinal(deg: number): string {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
-export function weatherCodeToDescription(code: number) {
-  return weatherCodeToDesc(code);
-}
+export function weatherCodeToDescription(code: number) { return weatherCodeToDesc(code); }
+export function weatherCodeIcon(code: number) { return weatherCodeToIcon(code); }
+export function windCardinal(deg: number) { return windDirToCardinal(deg); }
 
-export function weatherCodeIcon(code: number) {
-  return weatherCodeToIcon(code);
-}
-
-export function windCardinal(deg: number) {
-  return windDirToCardinal(deg);
-}
-
-export function useWeatherData(refreshIntervalMins: number) {
+export function useWeatherData(refreshIntervalMins: number, cities: CityConfig[]) {
   const [state, setState] = useState<WeatherState>({
     cities: {},
     lastUpdated: null,
@@ -93,7 +97,7 @@ export function useWeatherData(refreshIntervalMins: number) {
   const fetchAll = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
     const results = await Promise.all(
-      CITIES.map(city =>
+      cities.map(city =>
         fetchCityWeather(city).catch((): CityWeather => ({
           cityId: city.id, tempF: 0, windSpeed: 0, windDir: 0, humidity: 0,
           precipitation: 0, cloudCover: 0, weatherCode: 0, loading: false, error: true,
@@ -103,7 +107,7 @@ export function useWeatherData(refreshIntervalMins: number) {
     const citiesMap: Record<string, CityWeather> = {};
     results.forEach(r => { citiesMap[r.cityId] = r; });
     setState({ cities: citiesMap, lastUpdated: new Date(), loading: false });
-  }, []);
+  }, [cities]);
 
   useEffect(() => {
     fetchAll();

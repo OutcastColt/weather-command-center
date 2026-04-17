@@ -5,8 +5,10 @@ import NavBar from './components/NavBar';
 import Sidebar from './components/Sidebar';
 import MapView from './components/MapView';
 import InfoPanel from './components/InfoPanel';
-import { OverlayKey, RefreshInterval } from './types';
+import SettingsPage from './components/SettingsPage';
+import { MapType, OverlayKey, RefreshInterval } from './types';
 import { useWeatherData } from './hooks/useWeatherData';
+import { useCities } from './hooks/useCities';
 
 export default function App() {
   const [activeOverlays, setActiveOverlays] = useState<Set<OverlayKey>>(new Set(['wind']));
@@ -14,8 +16,11 @@ export default function App() {
   const [selectedCity, setSelectedCity] = useState('corpus');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mapType, setMapType] = useState<MapType>('standard');
 
-  const { cities, loading, refetch } = useWeatherData(refreshInterval);
+  const { cities, addCity, removeCity, resetToDefaults, geocoding, geocodeError, clearError } = useCities();
+  const { cities: cityWeather, loading, refetch } = useWeatherData(refreshInterval, cities);
 
   const handleToggleOverlay = useCallback((key: OverlayKey) => {
     setActiveOverlays(prev => {
@@ -44,6 +49,10 @@ export default function App() {
     setSelectedCity(id);
   }, []);
 
+  const handleSettingsToggle = useCallback(() => {
+    setSettingsOpen(prev => !prev);
+  }, []);
+
   const isAnyPanelOpen = sidebarOpen || infoPanelOpen;
 
   return (
@@ -55,6 +64,7 @@ export default function App() {
         onRefresh={refetch}
         onMenuToggle={handleMenuToggle}
         onInfoToggle={handleInfoToggle}
+        onSettingsToggle={handleSettingsToggle}
         loading={loading}
       />
 
@@ -69,16 +79,20 @@ export default function App() {
 
         <MapView
           activeOverlays={activeOverlays}
-          cityWeather={cities}
+          cityWeather={cityWeather}
           selectedCity={selectedCity}
           onSelectCity={handleSelectCity}
+          cities={cities}
+          mapType={mapType}
+          onMapTypeChange={setMapType}
         />
 
         <InfoPanel
-          cityWeather={cities}
+          cityWeather={cityWeather}
           selectedCity={selectedCity}
           onSelectCity={handleSelectCity}
           isOpen={infoPanelOpen}
+          cities={cities}
         />
       </div>
 
@@ -87,6 +101,19 @@ export default function App() {
           className="backdrop"
           onClick={handleCloseAll}
           aria-hidden="true"
+        />
+      )}
+
+      {settingsOpen && (
+        <SettingsPage
+          cities={cities}
+          onAddCity={addCity}
+          onRemoveCity={removeCity}
+          onResetDefaults={resetToDefaults}
+          geocoding={geocoding}
+          geocodeError={geocodeError}
+          onClearError={clearError}
+          onClose={handleSettingsToggle}
         />
       )}
     </>

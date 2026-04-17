@@ -1,12 +1,14 @@
 export type OverlayKey = 'wind' | 'cloud' | 'rain' | 'temp';
+export type MapType = 'standard' | 'satellite' | 'terrain';
 
 export interface CityConfig {
   id: string;
   name: string;
   lat: number;
   lon: number;
-  mapX: string; // CSS left % on map
-  mapY: string; // CSS top % on map
+  mapX: string;
+  mapY: string;
+  zipCode?: string;
 }
 
 export interface CityWeather {
@@ -18,6 +20,7 @@ export interface CityWeather {
   precipitation: number;
   cloudCover: number;
   weatherCode: number;
+  aqi?: number;
   loading: boolean;
   error: boolean;
 }

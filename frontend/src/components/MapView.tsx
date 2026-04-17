@@ -1,34 +1,73 @@
-import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import React, { useEffect, useRef, useState } from 'react';
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './MapView.css';
-import { CityWeather, OverlayKey } from '../types';
-import { CITIES } from '../hooks/useWeatherData';
+import { CityConfig, CityWeather, MapType, OverlayKey } from '../types';
 import { weatherCodeIcon, windCardinal } from '../hooks/useWeatherData';
 
-// South Texas bounding area
 const SOUTH_TEXAS_CENTER: [number, number] = [26.8, -97.8];
 const SOUTH_TEXAS_ZOOM = 8;
+const ZOOM_DETAIL_THRESHOLD = 9;
+
+const TILE_LAYERS: Record<MapType, { url: string; attribution: string; maxZoom: number }> = {
+  standard: {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19,
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, GeoEye, Earthstar Geographics',
+    maxZoom: 19,
+  },
+  terrain: {
+    url: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://stamen.com/">Stamen Design</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 18,
+  },
+};
 
 interface Props {
   activeOverlays: Set<OverlayKey>;
   cityWeather: Record<string, CityWeather>;
   selectedCity: string;
   onSelectCity: (id: string) => void;
+  cities: CityConfig[];
+  mapType: MapType;
+  onMapTypeChange: (t: MapType) => void;
 }
 
-/* City marker icons */
-function buildMarkerIcon(city: { name: string }, weather: CityWeather | undefined) {
+function aqiLabel(aqi: number): { text: string; color: string } {
+  if (aqi <= 50)  return { text: 'Good',     color: '#22c55e' };
+  if (aqi <= 100) return { text: 'Moderate', color: '#f59e0b' };
+  if (aqi <= 150) return { text: 'USG',      color: '#f97316' };
+  return { text: 'Unhealthy', color: '#ef4444' };
+}
+
+function buildMarkerIcon(city: CityConfig, weather: CityWeather | undefined, zoomedIn: boolean) {
   const temp = weather ? `${weather.tempF}°F` : '…';
   const icon = weather ? weatherCodeIcon(weather.weatherCode) : '…';
+
+  let extraBadges = '';
+  if (zoomedIn && weather && !weather.error) {
+    if (weather.precipitation > 0.01) {
+      extraBadges += `<span class="cm-rain-badge" title="Precipitation: ${weather.precipitation}&quot;">🌧</span>`;
+    }
+    if (weather.aqi !== undefined && weather.aqi > 50) {
+      const { text, color } = aqiLabel(weather.aqi);
+      extraBadges += `<span class="cm-aqi-badge" style="color:${color}" title="AQI: ${weather.aqi}">AQI ${text}</span>`;
+    }
+  }
+
   return L.divIcon({
     className: 'city-marker-icon',
     html: `
-      <div class="cm-wrapper">
+      <div class="cm-wrapper${zoomedIn ? ' cm-zoomed' : ''}">
         <div class="cm-label">
           <span class="cm-name">${city.name}</span>
           <span class="cm-badge">${temp}</span>
+          ${extraBadges}
         </div>
         <div class="cm-pin"></div>
         <div class="cm-icon" aria-hidden="true">${icon}</div>
@@ -38,8 +77,7 @@ function buildMarkerIcon(city: { name: string }, weather: CityWeather | undefine
   });
 }
 
-/* Wind arrow SVG overlay rendered over Leaflet as a pane */
-function WindOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeather> }) {
+function WindOverlayPane({ cityWeather, cities }: { cityWeather: Record<string, CityWeather>; cities: CityConfig[] }) {
   const map = useMap();
   const paneRef = useRef<HTMLDivElement | null>(null);
 
@@ -57,19 +95,24 @@ function WindOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeat
   useEffect(() => {
     if (!paneRef.current) return;
     const markers: L.Marker[] = [];
-    CITIES.forEach(city => {
+    cities.forEach(city => {
       const w = cityWeather[city.id];
       if (!w) return;
+      const speed = w.windSpeed;
+      const dur = Math.max(0.4, 2.5 - speed * 0.04).toFixed(2);
       const rows = 3; const cols = 4;
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const latOffset = (r - 1) * 0.4;
           const lonOffset = (c - 1.5) * 0.5;
           const rotation = w.windDir + (Math.random() - 0.5) * 15;
-          const opacity = 0.4 + Math.random() * 0.5;
+          const opacity = (0.4 + Math.random() * 0.5).toFixed(2);
+          const delay = (Math.random() * 2).toFixed(2);
           const icon = L.divIcon({
             className: 'wind-arrow-icon',
-            html: `<div class="wind-arrow" style="transform:rotate(${rotation}deg);opacity:${opacity}"></div>`,
+            html: `<div class="wind-arrow-outer" style="transform:rotate(${rotation}deg);--dur:${dur}s;--delay:${delay}s">
+                     <div class="wind-arrow" style="--wind-opacity:${opacity}"></div>
+                   </div>`,
             iconSize: [20, 28],
             iconAnchor: [10, 14],
           });
@@ -84,18 +127,17 @@ function WindOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeat
       }
     });
     return () => { markers.forEach(m => m.remove()); };
-  }, [map, cityWeather]);
+  }, [map, cityWeather, cities]);
 
   return null;
 }
 
-/* Temperature heatmap SVG overlay */
-function TempOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeather> }) {
+function TempOverlayPane({ cityWeather, cities }: { cityWeather: Record<string, CityWeather>; cities: CityConfig[] }) {
   const map = useMap();
 
   useEffect(() => {
     const svgOverlays: L.SVGOverlay[] = [];
-    CITIES.forEach(city => {
+    cities.forEach(city => {
       const w = cityWeather[city.id];
       if (!w) return;
       const t = w.tempF;
@@ -120,22 +162,30 @@ function TempOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeat
       svgOverlays.push(overlay);
     });
     return () => { svgOverlays.forEach(o => o.remove()); };
-  }, [map, cityWeather]);
+  }, [map, cityWeather, cities]);
 
   return null;
 }
 
-/* Cloud coverage overlay */
-function CloudOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeather> }) {
+function CloudOverlayPane({ cityWeather, cities }: { cityWeather: Record<string, CityWeather>; cities: CityConfig[] }) {
   const map = useMap();
 
   useEffect(() => {
     const svgOverlays: L.SVGOverlay[] = [];
-    CITIES.forEach(city => {
+    cities.forEach(city => {
       const w = cityWeather[city.id];
-      if (!w || w.cloudCover < 20) return;
-      const alpha = (w.cloudCover / 100) * 0.22;
-      const color = `rgba(167,139,250,${alpha.toFixed(2)})`;
+      if (!w || w.cloudCover < 10) return;
+
+      // Color-coded tiers: 0-25% light, 25-75% medium, 75-100% dense
+      let color: string;
+      if (w.cloudCover <= 25) {
+        color = `rgba(147,210,255,${(w.cloudCover / 100 * 0.25).toFixed(2)})`;
+      } else if (w.cloudCover <= 75) {
+        color = `rgba(100,150,230,${(0.12 + (w.cloudCover - 25) / 100 * 0.18).toFixed(2)})`;
+      } else {
+        color = `rgba(60,80,160,${(0.22 + (w.cloudCover - 75) / 100 * 0.18).toFixed(2)})`;
+      }
+
       const bounds: L.LatLngBoundsExpression = [
         [city.lat - 1.0, city.lon - 1.2],
         [city.lat + 1.0, city.lon + 1.2],
@@ -153,18 +203,17 @@ function CloudOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWea
       svgOverlays.push(overlay);
     });
     return () => { svgOverlays.forEach(o => o.remove()); };
-  }, [map, cityWeather]);
+  }, [map, cityWeather, cities]);
 
   return null;
 }
 
-/* Rain overlay */
-function RainOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeather> }) {
+function RainOverlayPane({ cityWeather, cities }: { cityWeather: Record<string, CityWeather>; cities: CityConfig[] }) {
   const map = useMap();
 
   useEffect(() => {
     const svgOverlays: L.SVGOverlay[] = [];
-    CITIES.forEach(city => {
+    cities.forEach(city => {
       const w = cityWeather[city.id];
       if (!w || w.precipitation < 0.01) return;
       const alpha = Math.min(w.precipitation * 2, 0.3);
@@ -186,25 +235,36 @@ function RainOverlayPane({ cityWeather }: { cityWeather: Record<string, CityWeat
       svgOverlays.push(overlay);
     });
     return () => { svgOverlays.forEach(o => o.remove()); };
-  }, [map, cityWeather]);
+  }, [map, cityWeather, cities]);
 
   return null;
 }
 
-/* City markers with popups */
 function CityMarkers({
-  cityWeather, selectedCity, onSelectCity
-}: { cityWeather: Record<string, CityWeather>; selectedCity: string; onSelectCity: (id: string) => void }) {
+  cityWeather, selectedCity, onSelectCity, cities,
+}: {
+  cityWeather: Record<string, CityWeather>;
+  selectedCity: string;
+  onSelectCity: (id: string) => void;
+  cities: CityConfig[];
+}) {
   const map = useMap();
   const markersRef = useRef<L.Marker[]>([]);
+  const [zoom, setZoom] = useState(map.getZoom());
+
+  useMapEvents({
+    zoomend: () => setZoom(map.getZoom()),
+  });
+
+  const zoomedIn = zoom >= ZOOM_DETAIL_THRESHOLD;
 
   useEffect(() => {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    CITIES.forEach(city => {
+    cities.forEach(city => {
       const w = cityWeather[city.id];
-      const icon = buildMarkerIcon(city, w);
+      const icon = buildMarkerIcon(city, w, zoomedIn);
       const marker = L.marker([city.lat, city.lon], {
         icon,
         title: city.name,
@@ -213,6 +273,9 @@ function CityMarkers({
       });
 
       if (w && !w.error) {
+        const aqiRow = w.aqi !== undefined
+          ? `<div class="popup-row"><span>AQI</span><span class="popup-val">${w.aqi} (${aqiLabel(w.aqi).text})</span></div>`
+          : '';
         const popupContent = `
           <div class="map-popup">
             <div class="popup-title">${city.name}</div>
@@ -221,6 +284,7 @@ function CityMarkers({
             <div class="popup-row"><span>Wind</span><span class="popup-val">${w.windSpeed} mph ${windCardinal(w.windDir)}</span></div>
             <div class="popup-row"><span>Cloud Cover</span><span class="popup-val">${w.cloudCover}%</span></div>
             <div class="popup-row"><span>Precip</span><span class="popup-val">${w.precipitation}"</span></div>
+            ${aqiRow}
           </div>`;
         marker.bindPopup(popupContent, { maxWidth: 200 });
       }
@@ -231,22 +295,44 @@ function CityMarkers({
     });
 
     return () => { markersRef.current.forEach(m => m.remove()); markersRef.current = []; };
-  }, [map, cityWeather, onSelectCity]);
+  }, [map, cityWeather, onSelectCity, cities, zoomedIn]);
 
-  /* Pan to selected city */
   useEffect(() => {
-    const city = CITIES.find(c => c.id === selectedCity);
+    const city = cities.find(c => c.id === selectedCity);
     if (city) { map.panTo([city.lat, city.lon], { animate: true, duration: 0.5 }); }
-  }, [map, selectedCity]);
+  }, [map, selectedCity, cities]);
 
   return null;
 }
 
-export default function MapView({ activeOverlays, cityWeather, selectedCity, onSelectCity }: Props) {
+function MapTypeSelector({ mapType, onMapTypeChange }: { mapType: MapType; onMapTypeChange: (t: MapType) => void }) {
+  const options: { key: MapType; label: string }[] = [
+    { key: 'standard',  label: 'Standard'  },
+    { key: 'satellite', label: 'Satellite' },
+    { key: 'terrain',   label: 'Terrain'   },
+  ];
+  return (
+    <div className="map-type-selector" role="group" aria-label="Map type">
+      {options.map(({ key, label }) => (
+        <button
+          key={key}
+          className={`map-type-btn${mapType === key ? ' active' : ''}`}
+          onClick={() => onMapTypeChange(key)}
+          aria-pressed={mapType === key}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function MapView({ activeOverlays, cityWeather, selectedCity, onSelectCity, cities, mapType, onMapTypeChange }: Props) {
   const hasData = Object.keys(cityWeather).length > 0;
+  const tile = TILE_LAYERS[mapType];
 
   return (
-    <div className="map-wrapper" role="region" aria-label="Interactive weather map of South Texas">
+    <div className="map-wrapper" role="region" aria-label="Interactive weather map">
       <MapContainer
         center={SOUTH_TEXAS_CENTER}
         zoom={SOUTH_TEXAS_ZOOM}
@@ -256,9 +342,10 @@ export default function MapView({ activeOverlays, cityWeather, selectedCity, onS
         attributionControl
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-          maxZoom={19}
+          key={mapType}
+          url={tile.url}
+          attribution={tile.attribution}
+          maxZoom={tile.maxZoom}
         />
 
         {hasData && (
@@ -267,14 +354,17 @@ export default function MapView({ activeOverlays, cityWeather, selectedCity, onS
               cityWeather={cityWeather}
               selectedCity={selectedCity}
               onSelectCity={onSelectCity}
+              cities={cities}
             />
-            {activeOverlays.has('wind')  && <WindOverlayPane  cityWeather={cityWeather} />}
-            {activeOverlays.has('temp')  && <TempOverlayPane  cityWeather={cityWeather} />}
-            {activeOverlays.has('cloud') && <CloudOverlayPane cityWeather={cityWeather} />}
-            {activeOverlays.has('rain')  && <RainOverlayPane  cityWeather={cityWeather} />}
+            {activeOverlays.has('wind')  && <WindOverlayPane  cityWeather={cityWeather} cities={cities} />}
+            {activeOverlays.has('temp')  && <TempOverlayPane  cityWeather={cityWeather} cities={cities} />}
+            {activeOverlays.has('cloud') && <CloudOverlayPane cityWeather={cityWeather} cities={cities} />}
+            {activeOverlays.has('rain')  && <RainOverlayPane  cityWeather={cityWeather} cities={cities} />}
           </>
         )}
       </MapContainer>
+
+      <MapTypeSelector mapType={mapType} onMapTypeChange={onMapTypeChange} />
     </div>
   );
 }

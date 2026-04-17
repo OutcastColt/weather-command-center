@@ -1,22 +1,23 @@
 import React from 'react';
 import './InfoPanel.css';
-import { CityWeather } from '../types';
-import { CITIES, weatherCodeIcon, weatherCodeToDescription, windCardinal } from '../hooks/useWeatherData';
+import { CityConfig, CityWeather } from '../types';
+import { weatherCodeIcon, weatherCodeToDescription, windCardinal } from '../hooks/useWeatherData';
 
 interface Props {
   cityWeather: Record<string, CityWeather>;
   selectedCity: string;
   onSelectCity: (id: string) => void;
   isOpen: boolean;
+  cities: CityConfig[];
 }
 
 function SkeletonBlock({ w, h }: { w?: string; h?: string }) {
   return <div className="skeleton" style={{ width: w || '100%', height: h || '20px', marginBottom: '4px' }} />;
 }
 
-export default function InfoPanel({ cityWeather, selectedCity, onSelectCity, isOpen }: Props) {
+export default function InfoPanel({ cityWeather, selectedCity, onSelectCity, isOpen, cities }: Props) {
   const sel = cityWeather[selectedCity];
-  const selCity = CITIES.find(c => c.id === selectedCity);
+  const selCity = cities.find(c => c.id === selectedCity);
   const loading = !sel || sel.loading;
 
   return (
@@ -83,9 +84,9 @@ export default function InfoPanel({ cityWeather, selectedCity, onSelectCity, isO
 
       {/* City Cards */}
       <div className="city-cards-section">
-        <div className="city-cards-title">South Texas Cities</div>
+        <div className="city-cards-title">My Cities</div>
         <div className="city-card-list" role="list">
-          {CITIES.map(city => {
+          {cities.map(city => {
             const w = cityWeather[city.id];
             const isSelected = selectedCity === city.id;
             return (
@@ -129,7 +130,7 @@ export default function InfoPanel({ cityWeather, selectedCity, onSelectCity, isO
       </div>
 
       {/* Alerts */}
-      <AlertsPanel cityWeather={cityWeather} />
+      <AlertsPanel cityWeather={cityWeather} cities={cities} />
 
       {/* Data Sources */}
       <div className="data-footer">
@@ -146,25 +147,30 @@ export default function InfoPanel({ cityWeather, selectedCity, onSelectCity, isO
   );
 }
 
-function AlertsPanel({ cityWeather }: { cityWeather: Record<string, CityWeather> }) {
+function AlertsPanel({ cityWeather, cities }: { cityWeather: Record<string, CityWeather>; cities: CityConfig[] }) {
   const alerts: { type: 'warning' | 'info'; icon: string; title: string; body: string }[] = [];
 
-  const temps = CITIES.map(c => cityWeather[c.id]?.tempF ?? 0).filter(Boolean);
-  const maxTemp = Math.max(...temps);
+  const temps = cities.map(c => cityWeather[c.id]?.tempF ?? 0).filter(Boolean);
+  const maxTemp = temps.length ? Math.max(...temps) : 0;
   if (maxTemp >= 95) {
     alerts.push({ type: 'warning', icon: '🌡️', title: 'Excessive Heat Warning', body: `Temperatures reaching ${maxTemp}°F. Dangerous heat conditions. Limit outdoor activities.` });
   } else if (maxTemp >= 90) {
     alerts.push({ type: 'warning', icon: '⚠️', title: 'Heat Advisory', body: `High temperatures ${maxTemp}°F expected. Stay hydrated and limit outdoor exposure.` });
   }
 
-  const isRaining = CITIES.some(c => (cityWeather[c.id]?.precipitation ?? 0) > 0.05);
+  const isRaining = cities.some(c => (cityWeather[c.id]?.precipitation ?? 0) > 0.05);
   if (isRaining) {
     alerts.push({ type: 'info', icon: '🌧️', title: 'Rain Observed', body: 'Precipitation detected in the region. Check city cards for specifics.' });
   }
 
-  const highWind = CITIES.find(c => (cityWeather[c.id]?.windSpeed ?? 0) >= 25);
+  const highWind = cities.find(c => (cityWeather[c.id]?.windSpeed ?? 0) >= 25);
   if (highWind) {
     alerts.push({ type: 'warning', icon: '💨', title: 'High Wind Advisory', body: `Winds exceeding 25 mph near ${highWind.name}. Secure loose objects outdoors.` });
+  }
+
+  const highAqi = cities.find(c => (cityWeather[c.id]?.aqi ?? 0) > 100);
+  if (highAqi) {
+    alerts.push({ type: 'warning', icon: '😷', title: 'Air Quality Alert', body: `Elevated AQI near ${highAqi.name}. Sensitive groups should limit outdoor exposure.` });
   }
 
   if (alerts.length === 0) {

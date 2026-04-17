@@ -56,6 +56,15 @@
 .refresh-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .refresh-btn:disabled { opacity: 0.6; cursor: default; }
 
+.settings-nav-btn {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  background: var(--bg-card); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.settings-nav-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
 .mobile-menu-btn,
 .mobile-info-btn {
   display: none;
