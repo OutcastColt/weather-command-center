@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import weatherRoutes from './routes/weather';
+import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +19,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/weather', weatherRoutes);
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Weather Command Center API running on port ${PORT}`);
