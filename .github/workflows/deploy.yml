@@ -3,13 +3,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy to Production
+    name: Deploy to Dev VM
     runs-on: ubuntu-latest
     environment: production
-    needs: []
 
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +18,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Build backend
         working-directory: backend
@@ -27,12 +31,73 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        run: |
-          npm ci
-          npm run build
+        run: npm ci && VITE_API_BASE_URL=${{ secrets.API_BASE_URL || 'http://192.168.56.10/api' }} npm run build
         env:
-          REACT_APP_API_BASE_URL: ${{ secrets.REACT_APP_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
 
-      # TODO: Add deployment steps (e.g., Docker push, cloud deploy)
-      - name: Deploy
-        run: echo "Deployment step placeholder — configure for your cloud provider"
+      - name: Set up SSH key
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.VM_HOST_KEY }}" > ~/.ssh/known_hosts
+
+      - name: Create directory structure on VM
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} \
+            "sudo mkdir -p /var/www/weather-command-center/{backend,frontend} && \
+             sudo chown -R \$USER:\$USER /var/www/weather-command-center"
+
+      - name: Deploy backend
+        run: |
+          scp -r backend/dist/          ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/var/www/weather-command-center/backend/
+          scp -r backend/node_modules/  ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/var/www/weather-command-center/backend/
+          scp    backend/package.json   ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/var/www/weather-command-center/backend/
+          scp    deploy/ecosystem.config.cjs ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/var/www/weather-command-center/
+
+      - name: Write backend .env on VM
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "cat > /var/www/weather-command-center/backend/.env" <<'ENV'
+          NODE_ENV=production
+          PORT=3001
+          CORS_ORIGINS=http://${{ secrets.VM_HOST }}
+          WEATHER_CACHE_TTL_MINUTES=${{ secrets.WEATHER_CACHE_TTL_MINUTES || 15 }}
+          ALERTS_CACHE_TTL_MINUTES=${{ secrets.ALERTS_CACHE_TTL_MINUTES || 5 }}
+          ENV
+
+      - name: Deploy frontend
+        run: |
+          scp -r frontend/dist/. ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/var/www/weather-command-center/frontend/
+
+      - name: Install dependencies and restart backend on VM
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} bash <<'REMOTE'
+          set -e
+          if ! command -v node &>/dev/null; then
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+          fi
+          if ! command -v pm2 &>/dev/null; then
+            sudo npm install -g pm2
+          fi
+          sudo mkdir -p /var/log/pm2
+          cd /var/www/weather-command-center
+          pm2 delete weather-api 2>/dev/null || true
+          pm2 start ecosystem.config.cjs
+          pm2 save
+          REMOTE
+
+      - name: Install Nginx config and reload
+        run: |
+          scp deploy/nginx.conf ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/tmp/weather-nginx.conf
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} \
+            "sudo cp /tmp/weather-nginx.conf /etc/nginx/sites-available/weather-command-center && \
+             sudo ln -sf /etc/nginx/sites-available/weather-command-center /etc/nginx/sites-enabled/ && \
+             sudo rm -f /etc/nginx/sites-enabled/default && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: Smoke test
+        run: |
+          sleep 3
+          curl --fail http://${{ secrets.VM_HOST }}/health
+          curl --fail "http://${{ secrets.VM_HOST }}/api/weather/current?city=corpus-christi"
+          echo "Smoke tests passed."
