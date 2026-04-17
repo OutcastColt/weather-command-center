@@ -1,0 +1,142 @@
+/* ── Design Tokens ──────────────────────────────────────────────────── */
+:root {
+  --bg-deep:    #07101f;
+  --bg-surface: #0d1e35;
+  --bg-card:    #122540;
+  --bg-hover:   #1a3057;
+  --border:     #1e3a5f;
+  --border-muted: #152d4a;
+
+  --text-primary:   #e2ecf8;
+  --text-secondary: #7fa3c8;
+  --text-muted:     #4a6d8f;
+
+  --accent-blue:  #3d9bff;
+  --accent-cyan:  #00d8e8;
+  --accent-teal:  #00b4a0;
+
+  --wind-color:  #00d8e8;
+  --cloud-color: #a78bfa;
+  --rain-color:  #3d9bff;
+  --temp-color:  #f59e0b;
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger:  #ef4444;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-panel: 0 8px 40px rgba(0,0,0,0.5);
+
+  --nav-h: 56px;
+  --sidebar-w: 260px;
+  --infopanel-w: 300px;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+button { cursor: pointer; border: none; background: none; color: inherit; font: inherit; }
+svg { flex-shrink: 0; }
+ul { list-style: none; }
+
+/* ── Skip nav ──────────────────────────────────────────────────────── */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  background: var(--accent-blue);
+  color: #fff;
+  padding: 8px 16px;
+  z-index: 9999;
+  border-radius: 0 0 var(--radius-sm) 0;
+  font-size: 14px;
+  text-decoration: none;
+}
+.skip-nav:focus { top: 0; }
+
+/* ── App Shell ─────────────────────────────────────────────────────── */
+.app {
+  display: flex;
+  height: 100vh;
+  padding-top: var(--nav-h);
+}
+
+/* ── Skeleton ──────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ── Pulse dot ─────────────────────────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(0.85); }
+}
+
+/* ── Leaflet overrides ─────────────────────────────────────────────── */
+.leaflet-container {
+  background: var(--bg-deep) !important;
+  font-family: inherit;
+}
+.leaflet-control-zoom {
+  display: none !important;
+}
+.leaflet-control-attribution {
+  background: rgba(7,16,31,0.75) !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  border-radius: 4px 0 0 0 !important;
+}
+.leaflet-control-attribution a {
+  color: var(--text-muted) !important;
+}
+.leaflet-popup-content-wrapper {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-panel) !important;
+}
+.leaflet-popup-tip {
+  background: var(--bg-card) !important;
+}
+.city-marker-icon {
+  background: none !important;
+  border: none !important;
+}
+
+/* ── Mobile backdrop ───────────────────────────────────────────────── */
+.backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(7,16,31,0.7); backdrop-filter: blur(2px);
+}
+
+/* ── Skeleton loader ───────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}

@@ -1,0 +1,73 @@
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: var(--nav-h);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 16px; gap: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+}
+
+.nav-logo {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 17px; font-weight: 700; letter-spacing: -0.3px;
+  color: var(--text-primary); white-space: nowrap;
+}
+.nav-logo-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, #0ea5e9, #3d9bff);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 12px rgba(61,155,255,0.4);
+  flex-shrink: 0;
+}
+.nav-divider { width: 1px; height: 24px; background: var(--border); }
+.nav-region {
+  font-size: 13px; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 6px;
+}
+.nav-region-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-teal); box-shadow: 0 0 6px var(--accent-teal);
+}
+.nav-spacer { flex: 1; }
+
+.refresh-indicator {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-muted);
+}
+.refresh-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(34,197,94,0.6);
+  animation: pulse 2s infinite;
+}
+.refresh-dot.loading {
+  background: var(--warning);
+  box-shadow: 0 0 6px rgba(245,158,11,0.6);
+}
+.refresh-countdown {
+  font-variant-numeric: tabular-nums; color: var(--text-secondary);
+}
+.refresh-btn {
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  background: var(--bg-card); border: 1px solid var(--border);
+  font-size: 12px; color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.refresh-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+.refresh-btn:disabled { opacity: 0.6; cursor: default; }
+
+.mobile-menu-btn,
+.mobile-info-btn {
+  display: none;
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  background: var(--bg-card); border: 1px solid var(--border);
+  align-items: center; justify-content: center;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-btn { display: flex; }
+  .mobile-info-btn { display: flex; }
+  .nav-region { display: none; }
+  .nav-divider { display: none; }
+}
