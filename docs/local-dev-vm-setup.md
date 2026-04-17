@@ -110,7 +110,7 @@ network:
     enp0s8:
       dhcp4: no
       addresses:
-        - 192.168.56.10/24  # Static IP on host-only network
+        - 192.168.56.199/24  # Static IP on host-only network
 ```
 
 Apply the config:
@@ -125,7 +125,7 @@ Verify the IP is assigned:
 ip addr show enp0s8
 ```
 
-From your Windows host, open a browser and go to `http://192.168.56.10` — you should see the Nginx welcome page.
+From your Windows host, open a browser and go to `http://192.168.56.199` — you should see the Nginx welcome page.
 
 ---
 
@@ -138,13 +138,13 @@ Choose one of the following methods to push site files to the VM.
 From your Windows terminal (Git Bash, WSL, or PowerShell with OpenSSH):
 
 ```bash
-scp -r ./your-site-folder/ username@192.168.56.10:/var/www/html/
+scp -r ./your-site-folder/ username@192.168.56.199:/var/www/html/
 ```
 
 Fix permissions if needed:
 
 ```bash
-ssh username@192.168.56.10 "sudo chown -R www-data:www-data /var/www/html"
+ssh username@192.168.56.199 "sudo chown -R www-data:www-data /var/www/html"
 ```
 
 ### Option B — Shared Folder (VirtualBox Guest Additions)
@@ -182,7 +182,7 @@ sudo git pull
 
 1. Make sure the VM is running and Nginx is active.
 2. On your Windows host, open any browser.
-3. Navigate to `http://192.168.56.10` (or the static IP you assigned).
+3. Navigate to `http://192.168.56.199` (or the static IP you assigned).
 4. You should see your deployed site.
 
 **Troubleshooting:**
@@ -223,13 +223,13 @@ Snapshots let you roll back the VM to a known-good state instantly.
 
 ```bash
 # SSH into VM from Windows
-ssh username@192.168.56.10
+ssh username@192.168.56.199
 
 # Restart Nginx
 sudo systemctl restart nginx
 
 # Deploy files via SCP
-scp -r ./dist/ username@192.168.56.10:/var/www/html/
+scp -r ./dist/ username@192.168.56.199:/var/www/html/
 
 # Check Nginx logs
 sudo tail -f /var/log/nginx/error.log

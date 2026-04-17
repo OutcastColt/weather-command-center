@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Deploy Weather Command Center to the RGVIG dev VM at 192.168.56.10
+# Deploy Weather Command Center to the RGVIG dev VM at 192.168.56.199
 # Usage: ./deploy/deploy-vm.sh <ssh-user>
 # Example: ./deploy/deploy-vm.sh devuser
 set -euo pipefail
 
-VM_IP="192.168.56.10"
+VM_IP="192.168.56.199"
 VM_USER="${1:?Usage: $0 <ssh-user>}"
 DEPLOY_DIR="/var/www/weather-command-center"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
