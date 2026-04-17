@@ -45,7 +45,7 @@ export class AlertsService {
     const { data } = await axios.get(NWS_ALERTS_URL, {
       params: { area: 'TX' },
       headers: {
-        'User-Agent': 'WeatherCommandCenter/1.0 (weather-command-center; contact@example.com)',
+        'User-Agent': 'WeatherCommandCenter/1.0 (weather-command-center; gforceklr650@gmail.com)',
         Accept: 'application/geo+json',
       },
     });
