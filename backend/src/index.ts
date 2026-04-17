@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { rateLimit } from 'express-rate-limit';
 import weatherRoutes from './routes/weather';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -18,7 +19,15 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/weather', weatherRoutes);
+const weatherRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+app.use('/api/weather', weatherRateLimit, weatherRoutes);
 
 app.use(errorHandler);
 
